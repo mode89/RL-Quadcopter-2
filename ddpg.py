@@ -171,19 +171,14 @@ class CriticNetwork(object):
         self.action_grads = tf.gradients(self.out, self.action)
 
     def create_critic_network(self):
-        inputs = tflearn.input_data(shape=[None, self.s_dim])
-        action = tflearn.input_data(shape=[None, self.a_dim])
-        net = tflearn.fully_connected(inputs, 400)
-        net = tflearn.layers.normalization.batch_normalization(net)
-        net = tflearn.activations.relu(net)
+        inputs = tf.layers.Input(shape=[self.s_dim])
+        action = tf.layers.Input(shape=[self.a_dim])
+        net = tf.layers.dense(inputs, 400, activation=tf.nn.relu)
+        net = tf.layers.batch_normalization(net)
 
-        # Add the action tensor in the 2nd hidden layer
-        # Use two temp layers to get the corresponding weights and biases
-        t1 = tflearn.fully_connected(net, 300)
-        t2 = tflearn.fully_connected(action, 300)
-
-        net = tflearn.activation(
-            tf.matmul(net, t1.W) + tf.matmul(action, t2.W) + t2.b, activation='relu')
+        t1 = tf.layers.dense(net, 300)
+        t2 = tf.layers.dense(action, 300)
+        net = tf.nn.relu(t1 + t2)
 
         initializer = tf.random_uniform_initializer(-0.003, 0.003)
         out = tf.layers.dense(net, 1, kernel_initializer=initializer)
