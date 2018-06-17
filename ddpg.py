@@ -47,6 +47,11 @@ class ReplayBuffer(object):
         self.buffer.clear()
         self.count = 0
 
+def build_target_network_updates(targetNetwork, network, tau):
+    return [targetParam.assign(param * tau + targetParam * (1.0 - tau))
+        for targetParam, param in \
+            zip(targetNetwork.params, network.params)]
+
 class Network:
 
     pass
@@ -64,13 +69,8 @@ class ActorNetwork(object):
 
         self.network = self.build_network()
         self.targetNetwork = self.build_network()
-
-        # Op for periodically updating target network with online network
-        # weights
-        self.update_target_network_params = \
-            [self.targetNetwork.params[i].assign(tf.multiply(self.network.params[i], self.tau) +
-                                                  tf.multiply(self.targetNetwork.params[i], 1. - self.tau))
-                for i in range(len(self.targetNetwork.params))]
+        self.update_target_network_params = build_target_network_updates(
+            self.targetNetwork, self.network, self.tau)
 
         # This gradient will be provided by the critic network
         self.action_gradient = tf.placeholder(tf.float32, [None, self.a_dim])
@@ -151,13 +151,8 @@ class CriticNetwork(object):
 
         self.network = self.build_network()
         self.targetNetwork = self.build_network()
-
-        # Op for periodically updating target network with online network
-        # weights with regularization
-        self.update_target_network_params = \
-            [self.targetNetwork.params[i].assign(tf.multiply(self.network.params[i], self.tau) \
-            + tf.multiply(self.targetNetwork.params[i], 1. - self.tau))
-                for i in range(len(self.targetNetwork.params))]
+        self.update_target_network_params = build_target_network_updates(
+            self.targetNetwork, self.network, self.tau)
 
         # Network target (y_i)
         self.predicted_q_value = tf.placeholder(tf.float32, [None, 1])
