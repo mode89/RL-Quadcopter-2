@@ -47,6 +47,10 @@ class ReplayBuffer(object):
         self.buffer.clear()
         self.count = 0
 
+class Network:
+
+    pass
+
 class ActorNetwork(object):
 
     def __init__(self, sess, state_dim, action_dim, action_bound, learning_rate, tau, batch_size):
@@ -58,65 +62,74 @@ class ActorNetwork(object):
         self.tau = tau
         self.batch_size = batch_size
 
-        # Actor Network
-        self.inputs, self.out = self.create_actor_network()
-
-        self.network_params = tf.trainable_variables()
-
-        # Target Network
-        self.target_inputs, self.target_out = self.create_actor_network()
-
-        self.target_network_params = tf.trainable_variables()[
-            len(self.network_params):]
+        self.network = self.build_network()
+        self.targetNetwork = self.build_network()
 
         # Op for periodically updating target network with online network
         # weights
         self.update_target_network_params = \
-            [self.target_network_params[i].assign(tf.multiply(self.network_params[i], self.tau) +
-                                                  tf.multiply(self.target_network_params[i], 1. - self.tau))
-                for i in range(len(self.target_network_params))]
+            [self.targetNetwork.params[i].assign(tf.multiply(self.network.params[i], self.tau) +
+                                                  tf.multiply(self.targetNetwork.params[i], 1. - self.tau))
+                for i in range(len(self.targetNetwork.params))]
 
         # This gradient will be provided by the critic network
         self.action_gradient = tf.placeholder(tf.float32, [None, self.a_dim])
 
         # Combine the gradients here
         self.unnormalized_actor_gradients = tf.gradients(
-            self.out, self.network_params, -self.action_gradient)
+            self.network.outputs, self.network.params, -self.action_gradient)
         self.actor_gradients = list(map(lambda x: tf.div(x, self.batch_size), self.unnormalized_actor_gradients))
 
         # Optimization Op
         self.optimize = tf.train.AdamOptimizer(self.learning_rate).\
-            apply_gradients(zip(self.actor_gradients, self.network_params))
+            apply_gradients(zip(self.actor_gradients, self.network.params))
 
         self.num_trainable_vars = len(
-            self.network_params) + len(self.target_network_params)
+            self.network.params) + len(self.targetNetwork.params)
 
-    def create_actor_network(self):
+    def build_network(self):
         inputs = tf.layers.Input(shape=[self.s_dim])
-        net = tf.layers.dense(inputs, 400, activation=tf.nn.relu)
-        net = tf.layers.batch_normalization(net)
-        net = tf.layers.dense(net, 300, activation=tf.nn.relu)
-        net = tf.layers.batch_normalization(net)
+
         initializer = tf.random_uniform_initializer(-0.003, 0.003)
-        net = tf.layers.dense(net, self.a_dim, activation=tf.nn.tanh,
-            kernel_initializer=initializer)
-        out = tf.multiply(net, self.action_bound)
-        return inputs, out
+        layers = [
+            tf.layers.Dense(400, activation=tf.nn.relu),
+            tf.layers.BatchNormalization(),
+            tf.layers.Dense(300, activation=tf.nn.relu),
+            tf.layers.BatchNormalization(),
+            tf.layers.Dense(self.a_dim, activation=tf.tanh,
+                kernel_initializer=initializer)
+        ]
+
+        outputs = inputs
+        for layer in layers:
+            outputs = layer(outputs)
+        outputs = tf.multiply(outputs, self.action_bound)
+
+        params = list()
+        for layer in layers:
+            params += layer.trainable_variables
+
+        network = Network()
+        network.inputs = inputs
+        network.outputs = outputs
+        network.params = params
+
+        return network
 
     def train(self, inputs, a_gradient):
         self.sess.run(self.optimize, feed_dict={
-            self.inputs: inputs,
+            self.network.inputs: inputs,
             self.action_gradient: a_gradient
         })
 
     def predict(self, inputs):
-        return self.sess.run(self.out, feed_dict={
-            self.inputs: inputs
+        return self.sess.run(self.network.outputs, feed_dict={
+            self.network.inputs: inputs
         })
 
     def predict_target(self, inputs):
-        return self.sess.run(self.target_out, feed_dict={
-            self.target_inputs: inputs
+        return self.sess.run(self.targetNetwork.outputs, feed_dict={
+            self.targetNetwork.inputs: inputs
         })
 
     def update_target_network(self):
