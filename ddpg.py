@@ -146,15 +146,7 @@ class CriticNetwork(object):
         self.targetNetwork = self.build_network()
         self.update_target_network_params = build_target_network_updates(
             self.targetNetwork, self.network, self.tau)
-
-        # Network target (y_i)
-        self.predicted_q_value = tf.placeholder(tf.float32, [None, 1])
-
-        # Define loss and optimization Op
-        self.loss = tf.reduce_mean(tf.square(
-            self.predicted_q_value - self.network.outputs))
-        self.optimize = tf.train.AdamOptimizer(
-            self.learning_rate).minimize(self.loss)
+        self.build_network_updates()
 
         self.actionValueGradient = tf.gradients(
             self.network.outputs, self.network.actionInputs)
@@ -190,6 +182,13 @@ class CriticNetwork(object):
         network.params = params
 
         return network
+
+    def build_network_updates(self):
+        self.predicted_q_value = tf.placeholder(tf.float32, [None, 1])
+        loss = tf.reduce_mean(tf.square(
+            self.predicted_q_value - self.network.outputs))
+        self.optimize = tf.train.AdamOptimizer(
+            self.learning_rate).minimize(loss)
 
     def train(self, inputs, action, predicted_q_value):
         return self.sess.run([self.network.outputs, self.optimize],
