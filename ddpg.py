@@ -219,26 +219,24 @@ class Critic:
     def update_target_network(self):
         self.sess.run(self.update_target_network_params)
 
-class OrnsteinUhlenbeckActionNoise:
-    def __init__(self, mu, sigma=0.3, theta=.15, dt=1e-2, x0=None):
+class OUNoise:
+
+    def __init__(self, size, mu=0.0, theta=0.15, sigma=0.3, dt=0.01):
+        self.mu = mu * np.ones(size)
         self.theta = theta
-        self.mu = mu
         self.sigma = sigma
         self.dt = dt
-        self.x0 = x0
         self.reset()
 
-    def __call__(self):
-        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + \
-                self.sigma * np.sqrt(self.dt) * np.random.normal(size=self.mu.shape)
-        self.x_prev = x
-        return x
-
     def reset(self):
-        self.x_prev = self.x0 if self.x0 is not None else np.zeros_like(self.mu)
+        self.state = self.mu.copy()
 
-    def __repr__(self):
-        return 'OrnsteinUhlenbeckActionNoise(mu={}, sigma={})'.format(self.mu, self.sigma)
+    def sample(self):
+        x = self.state
+        dx = self.theta * (self.mu - x) * self.dt + \
+            self.sigma * np.random.randn(len(x)) * np.sqrt(self.dt)
+        self.state = x + dx
+        return self.state
 
 def build_summaries():
     episode_reward = tf.Variable(0.)
@@ -251,7 +249,7 @@ def build_summaries():
 
     return summary_ops, summary_vars
 
-def train(sess, env, args, actor, critic, actor_noise):
+def train(sess, env, args, actor, critic, actorNoise):
 
     # Set up summary Ops
     summary_ops, summary_vars = build_summaries()
@@ -283,7 +281,8 @@ def train(sess, env, args, actor, critic, actor_noise):
 
             # Added exploration noise
             #a = actor.predict(np.reshape(s, (1, 3))) + (1. / (1. + i))
-            a = actor.predict(np.reshape(s, (1, actor.s_dim))) + actor_noise()
+            a = actor.predict(np.reshape(s, (1, actor.s_dim))) + \
+                actorNoise.sample()
 
             s2, r, terminal, info = env.step(a[0])
 
@@ -359,9 +358,9 @@ def main(args):
             float(args['critic_lr']), float(args['tau']),
             float(args['gamma']))
         
-        actor_noise = OrnsteinUhlenbeckActionNoise(mu=np.zeros(action_dim))
+        actorNoise = OUNoise(action_dim)
 
-        train(sess, env, args, actor, critic, actor_noise)
+        train(sess, env, args, actor, critic, actorNoise)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='provide arguments for DDPG agent')
