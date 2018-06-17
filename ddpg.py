@@ -59,12 +59,12 @@ class ActorNetwork(object):
         self.batch_size = batch_size
 
         # Actor Network
-        self.inputs, self.out, self.scaled_out = self.create_actor_network()
+        self.inputs, self.out = self.create_actor_network()
 
         self.network_params = tf.trainable_variables()
 
         # Target Network
-        self.target_inputs, self.target_out, self.target_scaled_out = self.create_actor_network()
+        self.target_inputs, self.target_out = self.create_actor_network()
 
         self.target_network_params = tf.trainable_variables()[
             len(self.network_params):]
@@ -81,7 +81,7 @@ class ActorNetwork(object):
 
         # Combine the gradients here
         self.unnormalized_actor_gradients = tf.gradients(
-            self.scaled_out, self.network_params, -self.action_gradient)
+            self.out, self.network_params, -self.action_gradient)
         self.actor_gradients = list(map(lambda x: tf.div(x, self.batch_size), self.unnormalized_actor_gradients))
 
         # Optimization Op
@@ -98,11 +98,10 @@ class ActorNetwork(object):
         net = tf.layers.dense(net, 300, activation=tf.nn.relu)
         net = tf.layers.batch_normalization(net)
         initializer = tf.random_uniform_initializer(-0.003, 0.003)
-        out = tf.layers.dense(net, self.a_dim, activation=tf.nn.tanh,
+        net = tf.layers.dense(net, self.a_dim, activation=tf.nn.tanh,
             kernel_initializer=initializer)
-        # Scale output to -action_bound to action_bound
-        scaled_out = tf.multiply(out, self.action_bound)
-        return inputs, out, scaled_out
+        out = tf.multiply(net, self.action_bound)
+        return inputs, out
 
     def train(self, inputs, a_gradient):
         self.sess.run(self.optimize, feed_dict={
@@ -111,12 +110,12 @@ class ActorNetwork(object):
         })
 
     def predict(self, inputs):
-        return self.sess.run(self.scaled_out, feed_dict={
+        return self.sess.run(self.out, feed_dict={
             self.inputs: inputs
         })
 
     def predict_target(self, inputs):
-        return self.sess.run(self.target_scaled_out, feed_dict={
+        return self.sess.run(self.target_out, feed_dict={
             self.target_inputs: inputs
         })
 
