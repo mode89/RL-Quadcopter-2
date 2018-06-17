@@ -149,29 +149,22 @@ class CriticNetwork(object):
         self.tau = tau
         self.gamma = gamma
 
-        # Create the critic network
-        self.inputs, self.action, self.out = self.create_critic_network()
-
-        self.network_params = tf.trainable_variables()[num_actor_vars:]
-
-        # Target Network
-        self.target_inputs, self.target_action, self.target_out = self.create_critic_network()
-
-        self.target_network_params = tf.trainable_variables()[(len(self.network_params) + num_actor_vars):]
+        self.network = self.build_network()
+        self.targetNetwork = self.build_network()
 
         # Op for periodically updating target network with online network
         # weights with regularization
         self.update_target_network_params = \
-            [self.target_network_params[i].assign(tf.multiply(self.network_params[i], self.tau) \
-            + tf.multiply(self.target_network_params[i], 1. - self.tau))
-                for i in range(len(self.target_network_params))]
+            [self.targetNetwork.params[i].assign(tf.multiply(self.network.params[i], self.tau) \
+            + tf.multiply(self.targetNetwork.params[i], 1. - self.tau))
+                for i in range(len(self.targetNetwork.params))]
 
         # Network target (y_i)
         self.predicted_q_value = tf.placeholder(tf.float32, [None, 1])
 
         # Define loss and optimization Op
         self.loss = tf.reduce_mean(tf.square(
-            self.predicted_q_value - self.out))
+            self.predicted_q_value - self.network.outputs))
         self.optimize = tf.train.AdamOptimizer(
             self.learning_rate).minimize(self.loss)
 
@@ -180,45 +173,65 @@ class CriticNetwork(object):
         # this will sum up the gradients of each critic output in the minibatch
         # w.r.t. that action. Each output is independent of all
         # actions except for one.
-        self.action_grads = tf.gradients(self.out, self.action)
+        self.action_grads = tf.gradients(
+            self.network.outputs, self.network.actionInputs)
 
-    def create_critic_network(self):
-        inputs = tf.layers.Input(shape=[self.s_dim])
-        action = tf.layers.Input(shape=[self.a_dim])
-        net = tf.layers.dense(inputs, 400, activation=tf.nn.relu)
-        net = tf.layers.batch_normalization(net)
+    def build_network(self):
+        layers = list()
 
-        t1 = tf.layers.dense(net, 300)
-        t2 = tf.layers.dense(action, 300)
-        net = tf.nn.relu(t1 + t2)
+        stateInputs = tf.layers.Input(shape=[self.s_dim])
+        layers.append(tf.layers.Dense(400, activation=tf.nn.relu))
+        outputs = layers[-1](stateInputs)
+        layers.append(tf.layers.BatchNormalization())
+        outputs = layers[-1](outputs)
+        layers.append(tf.layers.Dense(300))
+        outputs1 = layers[-1](outputs)
 
+        actionInputs = tf.layers.Input(shape=[self.a_dim])
+        layers.append(tf.layers.Dense(300))
+        outputs2 = layers[-1](actionInputs)
+
+        outputs = tf.nn.relu(outputs1 + outputs2)
         initializer = tf.random_uniform_initializer(-0.003, 0.003)
-        out = tf.layers.dense(net, 1, kernel_initializer=initializer)
-        return inputs, action, out
+        layers.append(tf.layers.Dense(1, kernel_initializer=initializer))
+        outputs = layers[-1](outputs)
+
+        params = list()
+        for layer in layers:
+            params += layer.trainable_variables
+
+        network = Network()
+        network.stateInputs = stateInputs
+        network.actionInputs = actionInputs
+        network.outputs = outputs
+        network.params = params
+
+        return network
 
     def train(self, inputs, action, predicted_q_value):
-        return self.sess.run([self.out, self.optimize], feed_dict={
-            self.inputs: inputs,
-            self.action: action,
-            self.predicted_q_value: predicted_q_value
-        })
+        return self.sess.run([self.network.outputs, self.optimize],
+            feed_dict={
+                self.network.stateInputs: inputs,
+                self.network.actionInputs: action,
+                self.predicted_q_value: predicted_q_value
+            })
 
     def predict(self, inputs, action):
-        return self.sess.run(self.out, feed_dict={
-            self.inputs: inputs,
-            self.action: action
+        return self.sess.run(self.network.outputs, feed_dict={
+            self.network.stateInputs: inputs,
+            self.network.actionInputs: action
         })
 
     def predict_target(self, inputs, action):
-        return self.sess.run(self.target_out, feed_dict={
-            self.target_inputs: inputs,
-            self.target_action: action
+        return self.sess.run(self.targetNetwork.outputs, feed_dict={
+            self.targetNetwork.stateInputs: inputs,
+            self.targetNetwork.actionInputs: action
         })
 
     def action_gradients(self, inputs, actions):
         return self.sess.run(self.action_grads, feed_dict={
-            self.inputs: inputs,
-            self.action: actions
+            self.network.stateInputs: inputs,
+            self.network.actionInputs: actions
         })
 
     def update_target_network(self):
