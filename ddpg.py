@@ -113,10 +113,10 @@ class ActorNetwork(object):
         self.networkUpdates = tf.train.AdamOptimizer(self.learning_rate).\
             apply_gradients(zip(gradients, self.network.params))
 
-    def train(self, inputs, a_gradient):
+    def train(self, inputs, actionValueGradient):
         self.sess.run(self.networkUpdates, feed_dict={
             self.network.inputs: inputs,
-            self.actionValueGradient: a_gradient
+            self.actionValueGradient: actionValueGradient
         })
 
     def predict(self, inputs):
@@ -156,12 +156,7 @@ class CriticNetwork(object):
         self.optimize = tf.train.AdamOptimizer(
             self.learning_rate).minimize(self.loss)
 
-        # Get the gradient of the net w.r.t. the action.
-        # For each action in the minibatch (i.e., for each x in xs),
-        # this will sum up the gradients of each critic output in the minibatch
-        # w.r.t. that action. Each output is independent of all
-        # actions except for one.
-        self.action_grads = tf.gradients(
+        self.actionValueGradient = tf.gradients(
             self.network.outputs, self.network.actionInputs)
 
     def build_network(self):
@@ -216,8 +211,8 @@ class CriticNetwork(object):
             self.targetNetwork.actionInputs: action
         })
 
-    def action_gradients(self, inputs, actions):
-        return self.sess.run(self.action_grads, feed_dict={
+    def action_value_gradient(self, inputs, actions):
+        return self.sess.run(self.actionValueGradient, feed_dict={
             self.network.stateInputs: inputs,
             self.network.actionInputs: actions
         })
@@ -321,7 +316,7 @@ def train(sess, env, args, actor, critic, actor_noise):
 
                 # Update the actor policy using the sampled gradient
                 a_outs = actor.predict(s_batch)
-                grads = critic.action_gradients(s_batch, a_outs)
+                grads = critic.action_value_gradient(s_batch, a_outs)
                 actor.train(s_batch, grads[0])
 
                 # Update target networks
