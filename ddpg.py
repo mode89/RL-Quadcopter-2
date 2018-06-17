@@ -260,7 +260,6 @@ def train(sess, env, args, actor, critic, actor_noise):
     summary_ops, summary_vars = build_summaries()
 
     sess.run(tf.global_variables_initializer())
-    writer = tf.summary.FileWriter(args['summary_dir'], sess.graph)
 
     # Initialize target network weights
     actor.update_target_network()
@@ -337,9 +336,6 @@ def train(sess, env, args, actor, critic, actor_noise):
                     summary_vars[1]: ep_ave_max_q / float(j)
                 })
 
-                writer.add_summary(summary_str, i)
-                writer.flush()
-
                 print('| Reward: {:d} | Episode: {:d} | Qmax: {:.4f}'.format(int(ep_reward), \
                         i, (ep_ave_max_q / float(j))))
                 break
@@ -370,17 +366,7 @@ def main(args):
         
         actor_noise = OrnsteinUhlenbeckActionNoise(mu=np.zeros(action_dim))
 
-        if args['use_gym_monitor']:
-            if not args['render_env']:
-                env = wrappers.Monitor(
-                    env, args['monitor_dir'], video_callable=False, force=True)
-            else:
-                env = wrappers.Monitor(env, args['monitor_dir'], force=True)
-
         train(sess, env, args, actor, critic, actor_noise)
-
-        if args['use_gym_monitor']:
-            env.monitor.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='provide arguments for DDPG agent')
@@ -399,12 +385,6 @@ if __name__ == '__main__':
     parser.add_argument('--max-episodes', help='max num of episodes to do while training', default=50000)
     parser.add_argument('--max-episode-len', help='max length of 1 episode', default=1000)
     parser.add_argument('--render-env', help='render the gym env', action='store_true')
-    parser.add_argument('--use-gym-monitor', help='record gym results', action='store_true')
-    parser.add_argument('--monitor-dir', help='directory for storing gym results', default='./results/gym_ddpg')
-    parser.add_argument('--summary-dir', help='directory for storing tensorboard info', default='./results/tf_ddpg')
-
-    parser.set_defaults(render_env=False)
-    parser.set_defaults(use_gym_monitor=True)
     
     args = vars(parser.parse_args())
     
