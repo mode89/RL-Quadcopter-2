@@ -100,10 +100,9 @@ class ActorNetwork(object):
         net = tflearn.fully_connected(net, 300)
         net = tflearn.layers.normalization.batch_normalization(net)
         net = tflearn.activations.relu(net)
-        # Final layer weights are init to Uniform[-3e-3, 3e-3]
-        w_init = tflearn.initializations.uniform(minval=-0.003, maxval=0.003)
-        out = tflearn.fully_connected(
-            net, self.a_dim, activation='tanh', weights_init=w_init)
+        initializer = tf.random_uniform_initializer(-0.003, 0.003)
+        out = tf.layers.dense(net, self.a_dim, activation=tf.nn.tanh,
+            kernel_initializer=initializer)
         # Scale output to -action_bound to action_bound
         scaled_out = tf.multiply(out, self.action_bound)
         return inputs, out, scaled_out
@@ -188,10 +187,8 @@ class CriticNetwork(object):
         net = tflearn.activation(
             tf.matmul(net, t1.W) + tf.matmul(action, t2.W) + t2.b, activation='relu')
 
-        # linear layer connected to 1 output representing Q(s,a)
-        # Weights are init to Uniform[-3e-3, 3e-3]
-        w_init = tflearn.initializations.uniform(minval=-0.003, maxval=0.003)
-        out = tflearn.fully_connected(net, 1, weights_init=w_init)
+        initializer = tf.random_uniform_initializer(-0.003, 0.003)
+        out = tf.layers.dense(net, 1, kernel_initializer=initializer)
         return inputs, action, out
 
     def train(self, inputs, action, predicted_q_value):
