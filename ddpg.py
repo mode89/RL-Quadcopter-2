@@ -84,9 +84,6 @@ class ActorNetwork(object):
         self.optimize = tf.train.AdamOptimizer(self.learning_rate).\
             apply_gradients(zip(self.actor_gradients, self.network.params))
 
-        self.num_trainable_vars = len(
-            self.network.params) + len(self.targetNetwork.params)
-
     def build_network(self):
         inputs = tf.layers.Input(shape=[self.s_dim])
 
@@ -135,13 +132,9 @@ class ActorNetwork(object):
     def update_target_network(self):
         self.sess.run(self.update_target_network_params)
 
-    def get_num_trainable_vars(self):
-        return self.num_trainable_vars
-
-
 class CriticNetwork(object):
 
-    def __init__(self, sess, state_dim, action_dim, learning_rate, tau, gamma, num_actor_vars):
+    def __init__(self, sess, state_dim, action_dim, learning_rate, tau, gamma):
         self.sess = sess
         self.s_dim = state_dim
         self.a_dim = action_dim
@@ -370,8 +363,7 @@ def main(args):
 
         critic = CriticNetwork(sess, state_dim, action_dim,
                                float(args['critic_lr']), float(args['tau']),
-                               float(args['gamma']),
-                               actor.get_num_trainable_vars())
+                               float(args['gamma']))
         
         actor_noise = OrnsteinUhlenbeckActionNoise(mu=np.zeros(action_dim))
 
