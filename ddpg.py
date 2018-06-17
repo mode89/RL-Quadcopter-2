@@ -71,18 +71,7 @@ class ActorNetwork(object):
         self.targetNetwork = self.build_network()
         self.update_target_network_params = build_target_network_updates(
             self.targetNetwork, self.network, self.tau)
-
-        # This gradient will be provided by the critic network
-        self.action_gradient = tf.placeholder(tf.float32, [None, self.a_dim])
-
-        # Combine the gradients here
-        self.unnormalized_actor_gradients = tf.gradients(
-            self.network.outputs, self.network.params, -self.action_gradient)
-        self.actor_gradients = list(map(lambda x: tf.div(x, self.batch_size), self.unnormalized_actor_gradients))
-
-        # Optimization Op
-        self.optimize = tf.train.AdamOptimizer(self.learning_rate).\
-            apply_gradients(zip(self.actor_gradients, self.network.params))
+        self.build_network_updates()
 
     def build_network(self):
         inputs = tf.layers.Input(shape=[self.s_dim])
@@ -113,10 +102,21 @@ class ActorNetwork(object):
 
         return network
 
+    def build_network_updates(self):
+        self.actionValueGradient = \
+            tf.placeholder(tf.float32, [None, self.a_dim])
+        gradients = tf.gradients(
+            self.network.outputs,
+            self.network.params,
+            -self.actionValueGradient)
+        gradients = map(lambda x: x / self.batch_size, gradients)
+        self.networkUpdates = tf.train.AdamOptimizer(self.learning_rate).\
+            apply_gradients(zip(gradients, self.network.params))
+
     def train(self, inputs, a_gradient):
-        self.sess.run(self.optimize, feed_dict={
+        self.sess.run(self.networkUpdates, feed_dict={
             self.network.inputs: inputs,
-            self.action_gradient: a_gradient
+            self.actionValueGradient: a_gradient
         })
 
     def predict(self, inputs):
