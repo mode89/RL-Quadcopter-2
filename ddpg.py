@@ -56,7 +56,7 @@ class Network:
 
     pass
 
-class ActorNetwork(object):
+class Actor:
 
     def __init__(self, sess, state_dim, action_dim, action_bound, learning_rate, tau, batch_size):
         self.sess = sess
@@ -132,7 +132,7 @@ class ActorNetwork(object):
     def update_target_network(self):
         self.sess.run(self.update_target_network_params)
 
-class CriticNetwork(object):
+class Critic:
 
     def __init__(self, sess, state_dim, action_dim, learning_rate, tau, gamma):
         self.sess = sess
@@ -351,13 +351,13 @@ def main(args):
         # Ensure action bound is symmetric
         assert (env.action_space.high == -env.action_space.low)
 
-        actor = ActorNetwork(sess, state_dim, action_dim, action_bound,
-                             float(args['actor_lr']), float(args['tau']),
-                             int(args['minibatch_size']))
+        actor = Actor(sess, state_dim, action_dim, action_bound,
+            float(args['actor_lr']), float(args['tau']),
+            int(args['minibatch_size']))
 
-        critic = CriticNetwork(sess, state_dim, action_dim,
-                               float(args['critic_lr']), float(args['tau']),
-                               float(args['gamma']))
+        critic = Critic(sess, state_dim, action_dim,
+            float(args['critic_lr']), float(args['tau']),
+            float(args['gamma']))
         
         actor_noise = OrnsteinUhlenbeckActionNoise(mu=np.zeros(action_dim))
 
