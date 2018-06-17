@@ -1,14 +1,3 @@
-""" 
-Implementation of DDPG - Deep Deterministic Policy Gradient
-
-Algorithm and hyperparameter details can be found here: 
-    http://arxiv.org/pdf/1509.02971v2.pdf
-
-The algorithm is tested on the Pendulum-v0 OpenAI gym task 
-and developed with tflearn + Tensorflow
-
-Author: Patrick Emami
-"""
 from collections import deque
 import tensorflow as tf
 import numpy as np
@@ -22,9 +11,6 @@ import random
 class ReplayBuffer(object):
 
     def __init__(self, buffer_size, random_seed=123):
-        """
-        The right side of the deque contains the most recent experiences 
-        """
         self.buffer_size = buffer_size
         self.count = 0
         self.buffer = deque()
@@ -62,18 +48,7 @@ class ReplayBuffer(object):
         self.buffer.clear()
         self.count = 0
 
-# ===========================
-#   Actor and Critic DNNs
-# ===========================
-
 class ActorNetwork(object):
-    """
-    Input to the network is the state, output is the action
-    under a deterministic policy.
-
-    The output layer activation is a tanh to keep the action
-    between -action_bound and action_bound
-    """
 
     def __init__(self, sess, state_dim, action_dim, action_bound, learning_rate, tau, batch_size):
         self.sess = sess
@@ -157,11 +132,6 @@ class ActorNetwork(object):
 
 
 class CriticNetwork(object):
-    """
-    Input to the network is the state and action, output is Q(s,a).
-    The action must be obtained from the output of the Actor network.
-
-    """
 
     def __init__(self, sess, state_dim, action_dim, learning_rate, tau, gamma, num_actor_vars):
         self.sess = sess
@@ -252,8 +222,6 @@ class CriticNetwork(object):
     def update_target_network(self):
         self.sess.run(self.update_target_network_params)
 
-# Taken from https://github.com/openai/baselines/blob/master/baselines/ddpg/noise.py, which is
-# based on http://math.stackexchange.com/questions/1287634/implementing-ornstein-uhlenbeck-in-matlab
 class OrnsteinUhlenbeckActionNoise:
     def __init__(self, mu, sigma=0.3, theta=.15, dt=1e-2, x0=None):
         self.theta = theta
@@ -275,10 +243,6 @@ class OrnsteinUhlenbeckActionNoise:
     def __repr__(self):
         return 'OrnsteinUhlenbeckActionNoise(mu={}, sigma={})'.format(self.mu, self.sigma)
 
-# ===========================
-#   Tensorflow Summary Ops
-# ===========================
-
 def build_summaries():
     episode_reward = tf.Variable(0.)
     tf.summary.scalar("Reward", episode_reward)
@@ -289,10 +253,6 @@ def build_summaries():
     summary_ops = tf.summary.merge_all()
 
     return summary_ops, summary_vars
-
-# ===========================
-#   Agent Training
-# ===========================
 
 def train(sess, env, args, actor, critic, actor_noise):
 
