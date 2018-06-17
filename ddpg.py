@@ -93,13 +93,11 @@ class ActorNetwork(object):
             self.network_params) + len(self.target_network_params)
 
     def create_actor_network(self):
-        inputs = tflearn.input_data(shape=[None, self.s_dim])
-        net = tflearn.fully_connected(inputs, 400)
-        net = tflearn.layers.normalization.batch_normalization(net)
-        net = tflearn.activations.relu(net)
-        net = tflearn.fully_connected(net, 300)
-        net = tflearn.layers.normalization.batch_normalization(net)
-        net = tflearn.activations.relu(net)
+        inputs = tf.layers.Input(shape=[self.s_dim])
+        net = tf.layers.dense(inputs, 400, activation=tf.nn.relu)
+        net = tf.layers.batch_normalization(net)
+        net = tf.layers.dense(net, 300, activation=tf.nn.relu)
+        net = tf.layers.batch_normalization(net)
         initializer = tf.random_uniform_initializer(-0.003, 0.003)
         out = tf.layers.dense(net, self.a_dim, activation=tf.nn.tanh,
             kernel_initializer=initializer)
