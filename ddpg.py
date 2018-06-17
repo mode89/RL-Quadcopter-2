@@ -3,7 +3,6 @@ import tensorflow as tf
 import numpy as np
 import gym
 from gym import wrappers
-import tflearn
 import argparse
 import pprint as pp
 import random
@@ -159,7 +158,8 @@ class CriticNetwork(object):
         self.predicted_q_value = tf.placeholder(tf.float32, [None, 1])
 
         # Define loss and optimization Op
-        self.loss = tflearn.mean_square(self.predicted_q_value, self.out)
+        self.loss = tf.reduce_mean(tf.square(
+            self.predicted_q_value - self.out))
         self.optimize = tf.train.AdamOptimizer(
             self.learning_rate).minimize(self.loss)
 
@@ -261,7 +261,6 @@ def train(sess, env, args, actor, critic, actor_noise):
     # Needed to enable BatchNorm. 
     # This hurts the performance on Pendulum but could be useful
     # in other environments.
-    # tflearn.is_training(True)
 
     for i in range(int(args['max_episodes'])):
 
