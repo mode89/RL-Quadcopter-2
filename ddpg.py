@@ -4,7 +4,6 @@ import numpy as np
 import gym
 from gym import wrappers
 import argparse
-import pprint as pp
 import random
 
 class ReplayBuffer(object):
@@ -390,7 +389,5 @@ if __name__ == '__main__':
         action='store_true')
     
     args = vars(parser.parse_args())
-    
-    pp.pprint(args)
 
     main(args)
