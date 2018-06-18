@@ -213,6 +213,7 @@ class Critic:
 class OUNoise:
 
     def __init__(self, size, mu=0.0, theta=0.15, sigma=0.3, dt=0.01):
+        self.random = np.random.RandomState(seed=1234)
         self.mu = mu * np.ones(size)
         self.theta = theta
         self.sigma = sigma
@@ -225,7 +226,7 @@ class OUNoise:
     def sample(self):
         x = self.state
         dx = self.theta * (self.mu - x) * self.dt + \
-            self.sigma * np.random.randn(len(x)) * np.sqrt(self.dt)
+            self.sigma * self.random.randn(len(x)) * np.sqrt(self.dt)
         self.state = x + dx
         return self.state
 
