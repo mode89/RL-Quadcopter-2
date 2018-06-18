@@ -232,21 +232,7 @@ class OUNoise:
         self.state = x + dx
         return self.state
 
-def build_summaries():
-    episode_reward = tf.Variable(0.)
-    tf.summary.scalar("Reward", episode_reward)
-    episode_ave_max_q = tf.Variable(0.)
-    tf.summary.scalar("Qmax Value", episode_ave_max_q)
-
-    summary_vars = [episode_reward, episode_ave_max_q]
-    summary_ops = tf.summary.merge_all()
-
-    return summary_ops, summary_vars
-
 def train(sess, env, args, actor, critic, actorNoise):
-
-    # Set up summary Ops
-    summary_ops, summary_vars = build_summaries()
 
     sess.run(tf.global_variables_initializer())
 
@@ -319,14 +305,8 @@ def train(sess, env, args, actor, critic, actorNoise):
             ep_reward += r
 
             if terminal:
-
-                summary_str = sess.run(summary_ops, feed_dict={
-                    summary_vars[0]: ep_reward,
-                    summary_vars[1]: ep_ave_max_q / float(j)
-                })
-
-                print('| Reward: {:d} | Episode: {:d} | Qmax: {:.4f}'.format(int(ep_reward), \
-                        i, (ep_ave_max_q / float(j))))
+                print('| Reward: {:d} | Episode: {:d} | Qmax: {:.4f}' \
+                    .format(int(ep_reward), i, ep_ave_max_q / float(j)))
                 break
 
 def main(args):
