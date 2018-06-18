@@ -54,7 +54,10 @@ def build_target_network_updates(targetNetwork, network, tau):
 
 class Network:
 
-    pass
+    def predict(self, session, *inputs):
+        return session.run(
+            self.outputs,
+            feed_dict=dict(zip(self.inputs, inputs)))
 
 class Actor:
 
@@ -96,7 +99,7 @@ class Actor:
             params += layer.trainable_variables
 
         network = Network()
-        network.inputs = inputs
+        network.inputs = [inputs]
         network.outputs = outputs
         network.params = params
 
@@ -115,19 +118,15 @@ class Actor:
 
     def train(self, inputs, actionValueGradient):
         self.sess.run(self.networkUpdates, feed_dict={
-            self.network.inputs: inputs,
+            self.network.inputs[0]: inputs,
             self.actionValueGradient: actionValueGradient
         })
 
     def predict(self, inputs):
-        return self.sess.run(self.network.outputs, feed_dict={
-            self.network.inputs: inputs
-        })
+        return self.network.predict(self.sess, inputs)
 
     def predict_target(self, inputs):
-        return self.sess.run(self.targetNetwork.outputs, feed_dict={
-            self.targetNetwork.inputs: inputs
-        })
+        return self.targetNetwork.predict(self.sess, inputs)
 
     def update_target_network(self):
         self.sess.run(self.update_target_network_params)
@@ -176,8 +175,9 @@ class Critic:
             params += layer.trainable_variables
 
         network = Network()
-        network.stateInputs = stateInputs
-        network.actionInputs = actionInputs
+        network.inputs = [stateInputs, actionInputs]
+        network.stateInputs = network.inputs[0]
+        network.actionInputs = network.inputs[1]
         network.outputs = outputs
         network.params = params
 
@@ -199,16 +199,10 @@ class Critic:
             })
 
     def predict(self, inputs, action):
-        return self.sess.run(self.network.outputs, feed_dict={
-            self.network.stateInputs: inputs,
-            self.network.actionInputs: action
-        })
+        return self.network.predict(self.sess, inputs, action)
 
     def predict_target(self, inputs, action):
-        return self.sess.run(self.targetNetwork.outputs, feed_dict={
-            self.targetNetwork.stateInputs: inputs,
-            self.targetNetwork.actionInputs: action
-        })
+        return self.targetNetwork.predict(self.sess, inputs, action)
 
     def action_value_gradient(self, inputs, actions):
         return self.sess.run(self.actionValueGradient, feed_dict={
