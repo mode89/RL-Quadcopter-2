@@ -94,7 +94,11 @@ class Actor:
         outputs = inputs
         for layer in layers:
             outputs = layer(outputs)
-        outputs = tf.multiply(outputs, self.action_bound)
+
+        actionMin = self.action_bound[0]
+        actionMax = self.action_bound[1]
+        actionRangeHalf = (actionMax - actionMin) / 2.0
+        outputs = outputs * actionRangeHalf + (actionMin + actionRangeHalf)
 
         params = list()
         for layer in layers:
@@ -241,13 +245,21 @@ class OUNoise:
 
 class Agent:
 
-    def __init__(self, stateDim, actionDim, actionMin, actionMax,
-            actorLearningRate, criticLearningRate, batchSize, tau, gamma,
-            bufferSize, seed):
+    def __init__(self,
+            stateDim,
+            actionDim,
+            actionBound,
+            actorLearningRate,
+            criticLearningRate,
+            batchSize,
+            tau,
+            gamma,
+            bufferSize,
+            seed):
         self.actor = Actor(
             state_dim=stateDim,
             action_dim=actionDim,
-            action_bound=(actionMax - actionMin) / 2.0,
+            action_bound=actionBound,
             learning_rate=actorLearningRate,
             tau=tau,
             batch_size=batchSize)
@@ -331,15 +343,11 @@ def main(args):
 
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
-    action_bound = env.action_space.high
-    # Ensure action bound is symmetric
-    assert (env.action_space.high == -env.action_space.low)
 
     agent = Agent(
         stateDim=state_dim,
         actionDim=action_dim,
-        actionMin=env.action_space.low,
-        actionMax=env.action_space.high,
+        actionBound=[env.action_space.low, env.action_space.high],
         actorLearningRate=args["actor_lr"],
         criticLearningRate=args["critic_lr"],
         batchSize=args["minibatch_size"],
