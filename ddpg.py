@@ -232,81 +232,84 @@ class OUNoise:
         self.state = x + dx
         return self.state
 
-def train(sess, env, args, actor, critic, actorNoise):
+class Agent:
 
-    sess.run(tf.global_variables_initializer())
+    def __init__(self, session, stateDim, actionDim, actionMin, actionMax,
+            actorLearningRate, criticLearningRate, batchSize, tau, gamma,
+            bufferSize, seed):
+        self.batchSize = batchSize
+        self.actor = Actor(sess=session, state_dim=stateDim,
+            action_dim=actionDim, action_bound=(actionMax - actionMin) / 2.0,
+            learning_rate=actorLearningRate, tau=tau, batch_size=batchSize)
+        self.critic = Critic(sess=session, state_dim=stateDim,
+            action_dim=actionDim, learning_rate=criticLearningRate,
+            tau=tau, gamma=gamma)
+        self.actorNoise = OUNoise(actionDim)
+        self.replayBuffer = ReplayBuffer(bufferSize, seed)
 
+    def act(self, state):
+        self.lastState = state
+        self.lastAction = \
+            self.actor.predict(np.reshape(state, (1, self.actor.s_dim))) + \
+            self.actorNoise.sample()
+        return self.lastAction
+
+    def learn(self, nextState, reward, done):
+        self.replayBuffer.add(
+            np.reshape(self.lastState, (self.actor.s_dim,)),
+            np.reshape(self.lastAction, (self.actor.a_dim,)),
+            reward,
+            done,
+            np.reshape(nextState, (self.actor.s_dim,)))
+
+        if self.replayBuffer.size() > self.batchSize:
+            s_batch, a_batch, r_batch, t_batch, s2_batch = \
+                self.replayBuffer.sample_batch(self.batchSize)
+
+            # Calculate targets
+            target_q = self.critic.predict_target(
+                s2_batch, self.actor.predict_target(s2_batch))
+
+            y_i = []
+            for k in range(self.batchSize):
+                if t_batch[k]:
+                    y_i.append(r_batch[k])
+                else:
+                    y_i.append(r_batch[k] + self.critic.gamma * target_q[k])
+
+            # Update the critic given the targets
+            predicted_q_value, _ = self.critic.train(
+                s_batch, a_batch, np.reshape(y_i, (self.batchSize, 1)))
+
+            # Update the actor policy using the sampled gradient
+            a_outs = self.actor.predict(s_batch)
+            grads = self.critic.action_value_gradient(s_batch, a_outs)
+            self.actor.train(s_batch, grads[0])
+
+            # Update target networks
+            self.actor.update_target_network()
+            self.critic.update_target_network()
+
+def train(env, agent, args):
     # Initialize target network weights
-    actor.update_target_network()
-    critic.update_target_network()
-
-    # Initialize replay memory
-    replay_buffer = ReplayBuffer(int(args['buffer_size']), int(args['random_seed']))
-
-    # Needed to enable BatchNorm. 
-    # This hurts the performance on Pendulum but could be useful
-    # in other environments.
+    agent.actor.update_target_network()
+    agent.critic.update_target_network()
 
     for i in range(int(args['max_episodes'])):
-
-        s = env.reset()
-
         ep_reward = 0
-        ep_ave_max_q = 0
-
+        state = env.reset()
         for j in range(int(args['max_episode_len'])):
-
             if args['render_env']:
                 env.render()
 
-            # Added exploration noise
-            #a = actor.predict(np.reshape(s, (1, 3))) + (1. / (1. + i))
-            a = actor.predict(np.reshape(s, (1, actor.s_dim))) + \
-                actorNoise.sample()
+            action = agent.act(state)
+            nextState, reward, done, info = env.step(action[0])
+            agent.learn(nextState, reward, done)
+            state = nextState
+            ep_reward += reward
 
-            s2, r, terminal, info = env.step(a[0])
-
-            replay_buffer.add(np.reshape(s, (actor.s_dim,)), np.reshape(a, (actor.a_dim,)), r,
-                              terminal, np.reshape(s2, (actor.s_dim,)))
-
-            # Keep adding experience to the memory until
-            # there are at least minibatch size samples
-            if replay_buffer.size() > int(args['minibatch_size']):
-                s_batch, a_batch, r_batch, t_batch, s2_batch = \
-                    replay_buffer.sample_batch(int(args['minibatch_size']))
-
-                # Calculate targets
-                target_q = critic.predict_target(
-                    s2_batch, actor.predict_target(s2_batch))
-
-                y_i = []
-                for k in range(int(args['minibatch_size'])):
-                    if t_batch[k]:
-                        y_i.append(r_batch[k])
-                    else:
-                        y_i.append(r_batch[k] + critic.gamma * target_q[k])
-
-                # Update the critic given the targets
-                predicted_q_value, _ = critic.train(
-                    s_batch, a_batch, np.reshape(y_i, (int(args['minibatch_size']), 1)))
-
-                ep_ave_max_q += np.amax(predicted_q_value)
-
-                # Update the actor policy using the sampled gradient
-                a_outs = actor.predict(s_batch)
-                grads = critic.action_value_gradient(s_batch, a_outs)
-                actor.train(s_batch, grads[0])
-
-                # Update target networks
-                actor.update_target_network()
-                critic.update_target_network()
-
-            s = s2
-            ep_reward += r
-
-            if terminal:
-                print('| Reward: {:d} | Episode: {:d} | Qmax: {:.4f}' \
-                    .format(int(ep_reward), i, ep_ave_max_q / float(j)))
+            if done:
+                print("Episode: {} Reward: {:7.3f}".format(i, ep_reward))
                 break
 
 def main(args):
@@ -324,17 +327,23 @@ def main(args):
         # Ensure action bound is symmetric
         assert (env.action_space.high == -env.action_space.low)
 
-        actor = Actor(sess, state_dim, action_dim, action_bound,
-            float(args['actor_lr']), float(args['tau']),
-            int(args['minibatch_size']))
+        agent = Agent(
+            session=sess,
+            stateDim=state_dim,
+            actionDim=action_dim,
+            actionMin=env.action_space.low,
+            actionMax=env.action_space.high,
+            actorLearningRate=args["actor_lr"],
+            criticLearningRate=args["critic_lr"],
+            batchSize=args["minibatch_size"],
+            tau=args["tau"],
+            gamma=args["gamma"],
+            bufferSize=args["buffer_size"],
+            seed=args["random_seed"])
 
-        critic = Critic(sess, state_dim, action_dim,
-            float(args['critic_lr']), float(args['tau']),
-            float(args['gamma']))
-        
-        actorNoise = OUNoise(action_dim)
+        sess.run(tf.global_variables_initializer())
 
-        train(sess, env, args, actor, critic, actorNoise)
+        train(env, agent, args)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='provide arguments for DDPG agent')
