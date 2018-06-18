@@ -9,44 +9,41 @@ import random
 
 class ReplayBuffer(object):
 
-    def __init__(self, buffer_size, seed=123):
+    class Sample:
+
+        def __init__(self, state, action, reward, nextState, done):
+            self.state = state
+            self.action = action
+            self.reward = reward
+            self.nextState = nextState
+            self.done = done
+
+    class Batch:
+
+        def __init__(self, samples):
+            self.size = len(samples)
+            self.state = np.array([s.state for s in samples])
+            self.action = np.array([s.action for s in samples])
+            self.reward = np.array([s.reward for s in samples])
+            self.nextState = np.array([s.nextState for s in samples])
+            self.done = np.array([s.done for s in samples])
+
+    def __init__(self, bufferSize, batchSize, seed=123):
+        self.buffer = deque(maxlen=bufferSize)
+        self.batchSize = batchSize
         self.random = random.Random()
         self.random.seed(seed)
-        self.buffer_size = buffer_size
-        self.count = 0
-        self.buffer = deque()
 
-    def add(self, s, a, r, t, s2):
-        experience = (s, a, r, t, s2)
-        if self.count < self.buffer_size: 
-            self.buffer.append(experience)
-            self.count += 1
+    def add(self, state, action, reward, nextState, done):
+        sample = ReplayBuffer.Sample(state, action, reward, nextState, done)
+        self.buffer.append(sample)
+
+    def sample(self):
+        if len(self.buffer) < self.batchSize:
+            return None
         else:
-            self.buffer.popleft()
-            self.buffer.append(experience)
-
-    def size(self):
-        return self.count
-
-    def sample_batch(self, batch_size):
-        batch = []
-
-        if self.count < batch_size:
-            batch = self.random.sample(self.buffer, self.count)
-        else:
-            batch = self.random.sample(self.buffer, batch_size)
-
-        s_batch = np.array([_[0] for _ in batch])
-        a_batch = np.array([_[1] for _ in batch])
-        r_batch = np.array([_[2] for _ in batch])
-        t_batch = np.array([_[3] for _ in batch])
-        s2_batch = np.array([_[4] for _ in batch])
-
-        return s_batch, a_batch, r_batch, t_batch, s2_batch
-
-    def clear(self):
-        self.buffer.clear()
-        self.count = 0
+            samples = self.random.sample(self.buffer, self.batchSize)
+            return ReplayBuffer.Batch(samples)
 
 def build_target_network_updates(targetNetwork, network, tau):
     return [targetParam.assign(param * tau + targetParam * (1.0 - tau))
@@ -238,7 +235,6 @@ class Agent:
     def __init__(self, session, stateDim, actionDim, actionMin, actionMax,
             actorLearningRate, criticLearningRate, batchSize, tau, gamma,
             bufferSize, seed):
-        self.batchSize = batchSize
         self.actor = Actor(sess=session, state_dim=stateDim,
             action_dim=actionDim, action_bound=(actionMax - actionMin) / 2.0,
             learning_rate=actorLearningRate, tau=tau, batch_size=batchSize)
@@ -246,7 +242,10 @@ class Agent:
             action_dim=actionDim, learning_rate=criticLearningRate,
             tau=tau, gamma=gamma)
         self.actorNoise = OUNoise(actionDim)
-        self.replayBuffer = ReplayBuffer(bufferSize, seed)
+        self.replayBuffer = ReplayBuffer(
+            bufferSize=bufferSize,
+            batchSize=batchSize,
+            seed=seed)
 
     def act(self, state):
         self.lastState = state
@@ -257,35 +256,35 @@ class Agent:
 
     def learn(self, nextState, reward, done):
         self.replayBuffer.add(
-            np.reshape(self.lastState, (self.actor.s_dim,)),
-            np.reshape(self.lastAction, (self.actor.a_dim,)),
-            reward,
-            done,
-            np.reshape(nextState, (self.actor.s_dim,)))
+            state=np.reshape(self.lastState, (self.actor.s_dim,)),
+            action=np.reshape(self.lastAction, (self.actor.a_dim,)),
+            reward=reward,
+            done=done,
+            nextState=np.reshape(nextState, (self.actor.s_dim,)))
 
-        if self.replayBuffer.size() > self.batchSize:
-            s_batch, a_batch, r_batch, t_batch, s2_batch = \
-                self.replayBuffer.sample_batch(self.batchSize)
-
+        batch = self.replayBuffer.sample()
+        if batch is not None:
             # Calculate targets
             target_q = self.critic.predict_target(
-                s2_batch, self.actor.predict_target(s2_batch))
+                batch.nextState,
+                self.actor.predict_target(batch.nextState))
 
             y_i = []
-            for k in range(self.batchSize):
-                if t_batch[k]:
-                    y_i.append(r_batch[k])
+            for k in range(batch.size):
+                if batch.done[k]:
+                    y_i.append(batch.reward[k])
                 else:
-                    y_i.append(r_batch[k] + self.critic.gamma * target_q[k])
+                    y_i.append(
+                        batch.reward[k] + self.critic.gamma * target_q[k])
 
             # Update the critic given the targets
             predicted_q_value, _ = self.critic.train(
-                s_batch, a_batch, np.reshape(y_i, (self.batchSize, 1)))
+                batch.state, batch.action, np.reshape(y_i, (batch.size, 1)))
 
             # Update the actor policy using the sampled gradient
-            a_outs = self.actor.predict(s_batch)
-            grads = self.critic.action_value_gradient(s_batch, a_outs)
-            self.actor.train(s_batch, grads[0])
+            a_outs = self.actor.predict(batch.state)
+            grads = self.critic.action_value_gradient(batch.state, a_outs)
+            self.actor.train(batch.state, grads[0])
 
             # Update target networks
             self.actor.update_target_network()
