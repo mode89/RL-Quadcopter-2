@@ -13,9 +13,9 @@ class ReplayBuffer(object):
         def __init__(self, state, action, reward, nextState, done):
             self.state = state
             self.action = action
-            self.reward = reward
+            self.reward = [reward]
             self.nextState = nextState
-            self.done = done
+            self.done = [1.0 if done else 0.0]
 
     class Batch:
 
@@ -269,17 +269,12 @@ class Agent:
                 batch.nextState,
                 self.actor.predict_target(batch.nextState))
 
-            y_i = []
-            for k in range(batch.size):
-                if batch.done[k]:
-                    y_i.append(batch.reward[k])
-                else:
-                    y_i.append(
-                        batch.reward[k] + self.critic.gamma * target_q[k])
+            y = batch.reward + np.multiply(
+                1.0 - batch.done, self.critic.gamma * target_q)
 
             # Update the critic given the targets
             predicted_q_value, _ = self.critic.train(
-                batch.state, batch.action, np.reshape(y_i, (batch.size, 1)))
+                batch.state, batch.action, y)
 
             # Update the actor policy using the sampled gradient
             a_outs = self.actor.predict(batch.state)
