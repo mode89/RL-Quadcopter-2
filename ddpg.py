@@ -58,8 +58,13 @@ class Network:
 
 class Actor:
 
-    def __init__(self, sess, state_dim, action_dim, action_bound, learning_rate, tau, batch_size):
-        self.sess = sess
+    def __init__(self,
+            state_dim,
+            action_dim,
+            action_bound,
+            learning_rate,
+            tau,
+            batch_size):
         self.s_dim = state_dim
         self.a_dim = action_dim
         self.action_bound = action_bound
@@ -114,24 +119,28 @@ class Actor:
             apply_gradients(zip(gradients, self.network.params))
 
     def train(self, inputs, actionValueGradient):
-        self.sess.run(self.networkUpdates, feed_dict={
+        self.session.run(self.networkUpdates, feed_dict={
             self.network.inputs[0]: inputs,
             self.actionValueGradient: actionValueGradient
         })
 
     def predict(self, inputs):
-        return self.network.predict(self.sess, inputs)
+        return self.network.predict(self.session, inputs)
 
     def predict_target(self, inputs):
-        return self.targetNetwork.predict(self.sess, inputs)
+        return self.targetNetwork.predict(self.session, inputs)
 
     def update_target_network(self):
-        self.sess.run(self.update_target_network_params)
+        self.session.run(self.update_target_network_params)
 
 class Critic:
 
-    def __init__(self, sess, state_dim, action_dim, learning_rate, tau, gamma):
-        self.sess = sess
+    def __init__(self,
+            state_dim,
+            action_dim,
+            learning_rate,
+            tau,
+            gamma):
         self.s_dim = state_dim
         self.a_dim = action_dim
         self.learning_rate = learning_rate
@@ -188,7 +197,7 @@ class Critic:
             self.learning_rate).minimize(loss)
 
     def train(self, inputs, action, predicted_q_value):
-        return self.sess.run([self.network.outputs, self.optimize],
+        return self.session.run([self.network.outputs, self.optimize],
             feed_dict={
                 self.network.stateInputs: inputs,
                 self.network.actionInputs: action,
@@ -196,19 +205,19 @@ class Critic:
             })
 
     def predict(self, inputs, action):
-        return self.network.predict(self.sess, inputs, action)
+        return self.network.predict(self.session, inputs, action)
 
     def predict_target(self, inputs, action):
-        return self.targetNetwork.predict(self.sess, inputs, action)
+        return self.targetNetwork.predict(self.session, inputs, action)
 
     def action_value_gradient(self, inputs, actions):
-        return self.sess.run(self.actionValueGradient, feed_dict={
+        return self.session.run(self.actionValueGradient, feed_dict={
             self.network.stateInputs: inputs,
             self.network.actionInputs: actions
         })
 
     def update_target_network(self):
-        self.sess.run(self.update_target_network_params)
+        self.session.run(self.update_target_network_params)
 
 class OUNoise:
 
@@ -232,20 +241,31 @@ class OUNoise:
 
 class Agent:
 
-    def __init__(self, session, stateDim, actionDim, actionMin, actionMax,
+    def __init__(self, stateDim, actionDim, actionMin, actionMax,
             actorLearningRate, criticLearningRate, batchSize, tau, gamma,
             bufferSize, seed):
-        self.actor = Actor(sess=session, state_dim=stateDim,
-            action_dim=actionDim, action_bound=(actionMax - actionMin) / 2.0,
-            learning_rate=actorLearningRate, tau=tau, batch_size=batchSize)
-        self.critic = Critic(sess=session, state_dim=stateDim,
-            action_dim=actionDim, learning_rate=criticLearningRate,
-            tau=tau, gamma=gamma)
+        self.actor = Actor(
+            state_dim=stateDim,
+            action_dim=actionDim,
+            action_bound=(actionMax - actionMin) / 2.0,
+            learning_rate=actorLearningRate,
+            tau=tau,
+            batch_size=batchSize)
+        self.critic = Critic(
+            state_dim=stateDim,
+            action_dim=actionDim,
+            learning_rate=criticLearningRate,
+            tau=tau,
+            gamma=gamma)
         self.actorNoise = OUNoise(actionDim)
         self.replayBuffer = ReplayBuffer(
             bufferSize=bufferSize,
             batchSize=batchSize,
             seed=seed)
+
+    def set_session(self, session):
+        self.actor.session = session
+        self.critic.session = session
 
     def act(self, state):
         self.lastState = state
@@ -304,36 +324,33 @@ def train(env, agent, args):
                 break
 
 def main(args):
+    env = gym.make(args['env'])
+    np.random.seed(int(args['random_seed']))
+    tf.set_random_seed(int(args['random_seed']))
+    env.seed(int(args['random_seed']))
 
-    with tf.Session() as sess:
+    state_dim = env.observation_space.shape[0]
+    action_dim = env.action_space.shape[0]
+    action_bound = env.action_space.high
+    # Ensure action bound is symmetric
+    assert (env.action_space.high == -env.action_space.low)
 
-        env = gym.make(args['env'])
-        np.random.seed(int(args['random_seed']))
-        tf.set_random_seed(int(args['random_seed']))
-        env.seed(int(args['random_seed']))
+    agent = Agent(
+        stateDim=state_dim,
+        actionDim=action_dim,
+        actionMin=env.action_space.low,
+        actionMax=env.action_space.high,
+        actorLearningRate=args["actor_lr"],
+        criticLearningRate=args["critic_lr"],
+        batchSize=args["minibatch_size"],
+        tau=args["tau"],
+        gamma=args["gamma"],
+        bufferSize=args["buffer_size"],
+        seed=args["random_seed"])
 
-        state_dim = env.observation_space.shape[0]
-        action_dim = env.action_space.shape[0]
-        action_bound = env.action_space.high
-        # Ensure action bound is symmetric
-        assert (env.action_space.high == -env.action_space.low)
-
-        agent = Agent(
-            session=sess,
-            stateDim=state_dim,
-            actionDim=action_dim,
-            actionMin=env.action_space.low,
-            actionMax=env.action_space.high,
-            actorLearningRate=args["actor_lr"],
-            criticLearningRate=args["critic_lr"],
-            batchSize=args["minibatch_size"],
-            tau=args["tau"],
-            gamma=args["gamma"],
-            bufferSize=args["buffer_size"],
-            seed=args["random_seed"])
-
-        sess.run(tf.global_variables_initializer())
-
+    with tf.Session() as session:
+        session.run(tf.global_variables_initializer())
+        agent.set_session(session)
         train(env, agent, args)
 
 if __name__ == '__main__':
