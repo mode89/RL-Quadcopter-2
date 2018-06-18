@@ -9,11 +9,12 @@ import random
 
 class ReplayBuffer(object):
 
-    def __init__(self, buffer_size, random_seed=123):
+    def __init__(self, buffer_size, seed=123):
+        self.random = random.Random()
+        self.random.seed(seed)
         self.buffer_size = buffer_size
         self.count = 0
         self.buffer = deque()
-        random.seed(random_seed)
 
     def add(self, s, a, r, t, s2):
         experience = (s, a, r, t, s2)
@@ -31,9 +32,9 @@ class ReplayBuffer(object):
         batch = []
 
         if self.count < batch_size:
-            batch = random.sample(self.buffer, self.count)
+            batch = self.random.sample(self.buffer, self.count)
         else:
-            batch = random.sample(self.buffer, batch_size)
+            batch = self.random.sample(self.buffer, batch_size)
 
         s_batch = np.array([_[0] for _ in batch])
         a_batch = np.array([_[1] for _ in batch])
