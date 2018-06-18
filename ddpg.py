@@ -291,10 +291,6 @@ class Agent:
             self.critic.update_target_network()
 
 def train(env, agent, args):
-    # Initialize target network weights
-    agent.actor.update_target_network()
-    agent.critic.update_target_network()
-
     for i in range(int(args['max_episodes'])):
         ep_reward = 0
         state = env.reset()
