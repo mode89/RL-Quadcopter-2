@@ -292,6 +292,8 @@ class Agent:
         return self.lastAction
 
     def learn(self, nextState, reward, done):
+        maxQ = 0.0
+
         self.replayBuffer.add(
             state=np.reshape(self.lastState, (self.actor.s_dim,)),
             action=np.reshape(self.lastAction, (self.actor.a_dim,)),
@@ -312,6 +314,7 @@ class Agent:
             # Update the critic given the targets
             predicted_q_value, _ = self.critic.train(
                 batch.state, batch.action, y)
+            maxQ = np.amax(predicted_q_value)
 
             # Update the actor policy using the sampled gradient
             a_outs = self.actor.predict(batch.state)
@@ -321,6 +324,8 @@ class Agent:
             # Update target networks
             self.actor.update_target_network()
             self.critic.update_target_network()
+
+        return maxQ
 
 def train(env, agent, args):
     for i in range(int(args['max_episodes'])):
