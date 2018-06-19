@@ -83,9 +83,9 @@ class Actor:
 
         initializer = tf.random_uniform_initializer(-0.003, 0.003)
         layers = [
-            tf.layers.Dense(400, activation=tf.nn.relu),
+            tf.layers.Dense(1024, activation=tf.nn.relu),
             tf.layers.BatchNormalization(),
-            tf.layers.Dense(300, activation=tf.nn.relu),
+            tf.layers.Dense(1024, activation=tf.nn.relu),
             tf.layers.BatchNormalization(),
             tf.layers.Dense(self.a_dim, activation=tf.tanh,
                 kernel_initializer=initializer)
@@ -164,18 +164,24 @@ class Critic:
         layers = list()
 
         stateInputs = tf.layers.Input(shape=[self.s_dim])
-        layers.append(tf.layers.Dense(400, activation=tf.nn.relu))
-        outputs = layers[-1](stateInputs)
-        layers.append(tf.layers.BatchNormalization())
-        outputs = layers[-1](outputs)
-        layers.append(tf.layers.Dense(300))
-        outputs1 = layers[-1](outputs)
-
         actionInputs = tf.layers.Input(shape=[self.a_dim])
-        layers.append(tf.layers.Dense(300))
-        outputs2 = layers[-1](actionInputs)
 
-        outputs = tf.nn.relu(outputs1 + outputs2)
+        layers.append(tf.layers.Dense(1024, activation=tf.nn.relu))
+        stateOutputs = layers[-1](stateInputs)
+        layers.append(tf.layers.BatchNormalization())
+        stateOutputs = layers[-1](stateOutputs)
+        layers.append(tf.layers.Dense(1024))
+        stateOutputs = layers[-1](stateOutputs)
+        layers.append(tf.layers.BatchNormalization())
+        stateOutputs = layers[-1](stateOutputs)
+
+        layers.append(tf.layers.Dense(1024))
+        actionOutputs = layers[-1](actionInputs)
+        layers.append(tf.layers.BatchNormalization())
+        actionOutputs = layers[-1](actionOutputs)
+
+        outputs = tf.nn.relu(stateOutputs + actionOutputs)
+
         initializer = tf.random_uniform_initializer(-0.003, 0.003)
         layers.append(tf.layers.Dense(1, kernel_initializer=initializer))
         outputs = layers[-1](outputs)
