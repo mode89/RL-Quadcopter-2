@@ -32,7 +32,7 @@ def train(agent, task, progressFile):
         avgReward = np.mean(rewards)
         episodeAvgMaxQ /= stepCount
 
-        summary =
+        summary = \
             "Episode: {} " \
             "Reward: {:7.3f} " \
             "Avg. Reward: {:7.3f} " \
