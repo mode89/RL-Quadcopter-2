@@ -25,7 +25,7 @@ class Task():
         diff = targetOrientation - orientation
         diff = np.remainder(diff, 2.0 * np.pi)
         diff[diff > np.pi] -= 2.0 * np.pi
-        return -np.abs(diff).sum()
+        return 0.2 * -np.abs(diff).sum()
 
     def get_accel_reward(self):
         direction = TARGET_POSE[:3] - self.sim.pose[:3]
