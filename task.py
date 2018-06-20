@@ -13,8 +13,12 @@ class Task():
         self.action_size = 4
 
     def get_reward(self):
-        return self.get_position_reward() + \
-            self.get_orientation_reward()
+        error = np.concatenate([
+            self.get_position_error(),
+            self.get_orientation_error()
+        ])
+        reward = -np.linalg.norm(error)
+        return reward
 
     def get_position_reward(self):
         return -self.get_position_error().sum()
