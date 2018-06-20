@@ -12,6 +12,21 @@ class Task():
         self.action_high = 900
         self.action_size = 4
 
+    def get_reward(self):
+        return self.get_position_reward() + \
+            self.get_orientation_reward()
+
+    def get_position_reward(self):
+        return -np.abs(TARGET_POSE[:3] - self.sim.pose[:3]).sum()
+
+    def get_orientation_reward(self):
+        orientation = self.sim.pose[3:6]
+        targetOrientation = TARGET_POSE[3:6]
+        diff = targetOrientation - orientation
+        diff = np.remainder(diff, 2.0 * np.pi)
+        diff[diff > np.pi] -= 2.0 * np.pi
+        return -np.abs(diff).sum()
+
     def get_accel_reward(self):
         direction = TARGET_POSE[:3] - self.sim.pose[:3]
         velocity = self.sim.v
