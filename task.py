@@ -12,7 +12,7 @@ class Task():
         self.action_high = 900
         self.action_size = 4
 
-    def get_reward(self):
+    def get_accel_reward(self):
         direction = TARGET_POSE[:3] - self.sim.pose[:3]
         velocity = self.sim.v
         timeStep = self.sim.dt
