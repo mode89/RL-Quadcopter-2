@@ -17,15 +17,22 @@ class Task():
             self.get_orientation_reward()
 
     def get_position_reward(self):
-        return -np.abs(TARGET_POSE[:3] - self.sim.pose[:3]).sum()
+        return -self.get_position_error().sum()
+
+    def get_position_error(self):
+        error = TARGET_POSE[:3] - self.sim.pose[:3]
+        error = np.abs(error)
+        return error
 
     def get_orientation_reward(self):
-        orientation = self.sim.pose[3:6]
-        targetOrientation = TARGET_POSE[3:6]
-        diff = targetOrientation - orientation
-        diff = np.remainder(diff, 2.0 * np.pi)
-        diff[diff > np.pi] -= 2.0 * np.pi
-        return 0.2 * -np.abs(diff).sum()
+        return -self.get_orientation_error().sum()
+
+    def get_orientation_error(self):
+        error = TARGET_POSE[3:6] - self.sim.pose[3:6]
+        error = np.remainder(error, 2.0 * np.pi)
+        error[error > np.pi] -= 2.0 * np.pi
+        error = np.abs(error)
+        return error
 
     def get_accel_reward(self):
         direction = TARGET_POSE[:3] - self.sim.pose[:3]
