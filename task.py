@@ -2,11 +2,12 @@ import numpy as np
 from physics_sim import PhysicsSim
 
 TARGET_POSE = np.array([0.0, 0.0, 10.0, 0.0, 0.0, 0.0])
+RUNTIME = 1.0
 
 class Task():
 
     def __init__(self):
-        self.sim = PhysicsSim(init_pose=TARGET_POSE, runtime=1.0)
+        self.sim = PhysicsSim(init_pose=TARGET_POSE, runtime=RUNTIME)
         self.state_size = self.state.shape[0]
         self.action_low = 0
         self.action_high = 900
