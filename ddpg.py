@@ -78,7 +78,7 @@ class Actor:
         self.build_network_updates()
 
     def build_network(self):
-        inputs = tf.layers.Input(shape=[self.s_dim])
+        inputs = tf.placeholder(tf.float32, [None, self.s_dim])
 
         initializer = tf.random_uniform_initializer(-0.003, 0.003)
         layers = [
@@ -162,8 +162,8 @@ class Critic:
     def build_network(self):
         layers = list()
 
-        stateInputs = tf.layers.Input(shape=[self.s_dim])
-        actionInputs = tf.layers.Input(shape=[self.a_dim])
+        stateInputs = tf.placeholder(tf.float32, [None, self.s_dim])
+        actionInputs = tf.placeholder(tf.float32, [None, self.a_dim])
 
         layers.append(tf.layers.Dense(1024, activation=tf.nn.relu))
         stateOutputs = layers[-1](stateInputs)
