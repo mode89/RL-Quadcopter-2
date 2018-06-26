@@ -3,9 +3,11 @@ from ddpg import Agent
 import numpy as np
 from task import Task
 import tensorflow as tf
+import json
 
 def train(agent, task, progressFile):
     rewards = deque(maxlen=100)
+    summary = list()
 
     for episodeId in range(100000):
         episodeReward = 0.0
@@ -24,20 +26,17 @@ def train(agent, task, progressFile):
         rewards.append(episodeReward)
         avgReward = np.mean(rewards)
 
-        summary = \
-            "Episode: {} " \
-            "Reward: {:7.3f} " \
-            "Avg. Reward: {:7.3f} " \
-            "Qmax: {:7.3f}" \
-                .format(
-                    episodeId,
-                    episodeReward,
-                    avgReward,
-                    episodeAvgMaxQ)
-        print(summary)
+        print("Episode: {} Reward: {:4.3f} Avg. reward: {:4.3f}". \
+            format(episodeId, episodeReward, avgReward))
 
-        progressFile.write(summary + "\n")
-        progressFile.flush()
+        summary.append({
+            "episodeId": episodeId,
+            "reward": episodeReward,
+            "averageReward": avgReward,
+        })
+
+        with open("summary.json", "w") as summaryFile:
+            json.dump(summary, summaryFile, indent=True)
 
 if __name__ == "__main__":
     task = Task()
