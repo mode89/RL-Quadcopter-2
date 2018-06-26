@@ -16,21 +16,15 @@ class Task():
     def get_reward(self):
         error = np.concatenate([
             self.get_position_error(),
-            self.get_orientation_error()
+            self.get_orientation_error(),
         ])
         reward = -np.linalg.norm(error)
         return reward
-
-    def get_position_reward(self):
-        return -self.get_position_error().sum()
 
     def get_position_error(self):
         error = TARGET_POSE[:3] - self.sim.pose[:3]
         error = np.abs(error)
         return error
-
-    def get_orientation_reward(self):
-        return -self.get_orientation_error().sum()
 
     def get_orientation_error(self):
         error = TARGET_POSE[3:6] - self.sim.pose[3:6]
@@ -38,22 +32,6 @@ class Task():
         error[error > np.pi] -= 2.0 * np.pi
         error = np.abs(error)
         return error
-
-    def get_accel_reward(self):
-        direction = TARGET_POSE[:3] - self.sim.pose[:3]
-        velocity = self.sim.v
-        timeStep = self.sim.dt
-        timeStep2 = timeStep * timeStep
-        perfectAccel = 2.0 * (direction - velocity * timeStep) / timeStep2
-        perfectAccelNorm = np.linalg.norm(perfectAccel)
-        maxAccel = 50.0
-        if perfectAccelNorm > maxAccel:
-            perfectAccel = perfectAccel / perfectAccelNorm * maxAccel
-            perfectAccelNorm = maxAccel
-        accel = self.sim.linear_accel
-        accelError = perfectAccel - accel
-        reward = 1.0 - np.linalg.norm(accelError) / perfectAccelNorm
-        return reward
 
     @property
     def state(self):

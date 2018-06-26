@@ -9,7 +9,6 @@ def train(agent, task, progressFile):
 
     for episodeId in range(100000):
         episodeReward = 0.0
-        episodeAvgMaxQ = 0.0
         state = task.reset()
 
         stepCount = 0
@@ -17,20 +16,13 @@ def train(agent, task, progressFile):
             stepCount += 1
             action = agent.act(state)
             nextState, reward, done = task.step(action[0])
-            maxQ = agent.learn(
-                nextState=nextState,
-                reward=reward,
-                done=done)
+            agent.learn(nextState=nextState, reward=reward, done=done)
             state = nextState
-
             episodeReward += reward
-            episodeAvgMaxQ += maxQ
-
             if done: break
 
         rewards.append(episodeReward)
         avgReward = np.mean(rewards)
-        episodeAvgMaxQ /= stepCount
 
         summary = \
             "Episode: {} " \
@@ -43,10 +35,6 @@ def train(agent, task, progressFile):
                     avgReward,
                     episodeAvgMaxQ)
         print(summary)
-        print("{:2.2f} {:2.2f} {:2.2f}  {:2.2f} {:2.2f} {:2.2f}".format(
-            task.sim.pose[0], task.sim.pose[1], task.sim.pose[2],
-            task.sim.pose[3], task.sim.pose[4], task.sim.pose[5]))
-        print(agent.lastAction)
 
         progressFile.write(summary + "\n")
         progressFile.flush()
