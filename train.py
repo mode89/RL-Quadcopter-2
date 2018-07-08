@@ -5,7 +5,7 @@ from task import Task
 import tensorflow as tf
 import json
 
-def train(agent, task, progressFile):
+def train(agent, task):
     rewards = deque(maxlen=100)
     summary = list()
 
@@ -56,5 +56,4 @@ if __name__ == "__main__":
     with tf.Session() as session:
         session.run(tf.global_variables_initializer())
         agent.set_session(session)
-        with open("progress.txt", "w") as progressFile:
-            train(agent, task, progressFile)
+        train(agent, task)
