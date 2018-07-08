@@ -18,7 +18,7 @@ class Task():
             self.get_position_error(),
             self.get_orientation_error(),
         ])
-        reward = -np.linalg.norm(error)
+        reward = -np.sqrt(np.mean(error ** 2))
         return reward
 
     def get_position_error(self):
