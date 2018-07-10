@@ -1,5 +1,5 @@
 from collections import deque
-from ddpg import Agent
+from agents.agent import Agent
 import numpy as np
 from task import Task
 import tensorflow as tf
